@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+.idea/
+.codex/
+photo/
+初步设计方案.md
+local.properties
+build/
+**/build/
+*.iml
+captures/
+artifacts/

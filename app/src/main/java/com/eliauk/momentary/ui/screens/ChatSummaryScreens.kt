@@ -1,0 +1,249 @@
+package com.eliauk.momentary.ui.screens
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import com.eliauk.momentary.model.ChatMessage
+import com.eliauk.momentary.model.MomentaryUiState
+import com.eliauk.momentary.ui.components.PaperCard
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatScreen(
+    messages: List<ChatMessage>,
+    onBack: () -> Unit,
+    onSend: (String) -> Unit,
+    onFavorite: (Long) -> Unit,
+    onIncludeToday: (Long) -> Unit,
+) {
+    var draft by remember { mutableStateOf("") }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    }
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("和片刻聊聊") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("随时和片刻说说……") },
+                    shape = MaterialTheme.shapes.large,
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                )
+                IconButton(
+                    onClick = {
+                        onSend(draft)
+                        draft = ""
+                    },
+                    enabled = draft.isNotBlank(),
+                ) {
+                    Icon(Icons.Filled.Send, contentDescription = "发送")
+                }
+            }
+        },
+    ) { padding ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = padding.calculateTopPadding() + 12.dp,
+                end = 16.dp,
+                bottom = padding.calculateBottomPadding() + 16.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            items(messages, key = { it.id }, contentType = { if (it.isUser) "user" else "ai" }) { message ->
+                ChatBubble(message, onFavorite, onIncludeToday)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(
+    message: ChatMessage,
+    onFavorite: (Long) -> Unit,
+    onIncludeToday: (Long) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start,
+    ) {
+        PaperCard(
+            modifier = Modifier.fillMaxWidth(if (message.isUser) 0.82f else 0.9f),
+            contentPadding = PaddingValues(16.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (!message.isUser) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("片刻 AI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                if (!message.isUser) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { onFavorite(message.id) },
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        ) {
+                            Icon(
+                                if (message.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = null,
+                            )
+                            Text(if (message.isFavorite) "已收藏" else "收藏", Modifier.padding(start = 6.dp))
+                        }
+                        Button(
+                            onClick = { onIncludeToday(message.id) },
+                            enabled = !message.isIncludedToday,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        ) {
+                            Icon(if (message.isIncludedToday) Icons.Filled.Check else Icons.Filled.AutoAwesome, contentDescription = null)
+                            Text(if (message.isIncludedToday) "已收录" else "收录到今天", Modifier.padding(start = 6.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class SummaryBlock(val title: String, val body: String)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SummaryScreen(state: MomentaryUiState, onBack: () -> Unit, onSave: () -> Unit) {
+    val blocks = listOf(
+        SummaryBlock("今天发生了什么", state.entries.take(3).joinToString("\n") { "• ${it.text.substringBefore('\n')}" }),
+        SummaryBlock("心情和状态", "整体心情以${state.selectedMood}为主。一天里有疲惫，也有和朋友相处后的松弛。"),
+        SummaryBlock("灵感与想法", "把生活想成许多种颜色，每一种都值得被认真经历。"),
+        SummaryBlock("感谢", "感谢有人愿意听自己说话，也感谢今天留下这些诚实的片刻。"),
+        SummaryBlock("未完成待办", "□ 整理实验数据\n□ 准备下周汇报\n□ 给自己留一个不赶路的晚上"),
+    )
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("今日总结")
+                    Text("7月14日 · 星期二", style = MaterialTheme.typography.labelMedium)
+                } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = padding.calculateTopPadding() + 16.dp,
+                end = 16.dp,
+                bottom = padding.calculateBottomPadding() + 24.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            items(blocks, key = { it.title }) { block ->
+                PaperCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            block.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        Text(block.body, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+            item {
+                PaperCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("片刻的回应", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            "你并不是没有做成什么。你今天照顾了身体、认真听了朋友，也把那些容易消失的感受留下来了。生活不总靠巨大的进展向前，有时只是把注意力放回真正重要的地方。",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
+            item {
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                ) {
+                    Text("装订成今天", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
+    }
+}
