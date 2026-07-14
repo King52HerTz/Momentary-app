@@ -1,6 +1,7 @@
 package com.eliauk.momentary.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -45,7 +47,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -60,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
@@ -390,12 +392,27 @@ fun ProfileScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { Text("我的片刻", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary) }
         item {
-            PaperCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Eliauk", style = MaterialTheme.typography.titleLarge)
-                    Text("片刻只帮助你整理，不替你定义生活。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("我的片刻", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+                Text("把陪伴方式调成你舒服的样子。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        item {
+            PaperCard(
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Eliauk", style = MaterialTheme.typography.titleLarge)
+                        Text("片刻只整理生活，不替你定义生活。", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text("本地", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -419,52 +436,52 @@ fun ProfileScreen(
             )
         }
         item {
-            PaperCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
-                Column {
-                    ListItem(
-                        headlineContent = { Text("AI 陪伴风格") },
-                        supportingContent = { Text("当前：${activePersona.name} · ${activePersona.responseStyle}") },
-                        leadingContent = { Icon(Icons.Filled.AutoAwesome, null) },
-                    )
-                    HorizontalDivider()
-                    ListItem(
-                        headlineContent = { Text("导出样式") },
-                        supportingContent = { Text("纸张长图 · 摘要卡片") },
-                        leadingContent = { Icon(Icons.Filled.Palette, null) },
-                    )
-                    HorizontalDivider()
-                    ListItem(
-                        headlineContent = { Text("深色模式") },
-                        supportingContent = { Text("跟随系统的主题正在准备中") },
-                        leadingContent = { Icon(Icons.Filled.DarkMode, null) },
-                        trailingContent = { Switch(checked = darkMode, onCheckedChange = { darkMode = it }, enabled = false) },
-                    )
-                }
+            Text("偏好", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+        }
+        item {
+            Column {
+                SettingsRow(
+                    icon = Icons.Filled.AutoAwesome,
+                    title = "AI 陪伴风格",
+                    description = "${activePersona.name} · ${activePersona.responseStyle}",
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsRow(
+                    icon = Icons.Filled.Palette,
+                    title = "导出样式",
+                    description = "纸张长图 · 摘要卡片",
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsRow(
+                    icon = Icons.Filled.DarkMode,
+                    title = "深色模式",
+                    description = "跟随系统，正在准备中",
+                    trailing = { Switch(checked = darkMode, onCheckedChange = { darkMode = it }, enabled = false) },
+                )
             }
         }
         item {
             Text("隐私与数据", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
         }
         item {
-            PaperCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
-                Column {
-                    ListItem(
-                        headlineContent = { Text("本地存储") },
-                        supportingContent = { Text("新增片刻保存在这台设备上") },
-                        leadingContent = { Icon(Icons.Filled.Storage, null) },
-                    )
-                    HorizontalDivider()
-                    ListItem(
-                        headlineContent = { Text("应用锁") },
-                        supportingContent = { Text("将在接入正式数据层时开放") },
-                        leadingContent = { Icon(Icons.Filled.Lock, null) },
-                    )
-                    HorizontalDivider()
-                    ListItem(
-                        headlineContent = { Text("清除本地数据") },
-                        leadingContent = { Icon(Icons.Filled.DeleteOutline, null) },
-                    )
-                }
+            Column {
+                SettingsRow(
+                    icon = Icons.Filled.Storage,
+                    title = "本地存储",
+                    description = "新增片刻保存在这台设备上",
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsRow(
+                    icon = Icons.Filled.Lock,
+                    title = "应用锁",
+                    description = "将在接入正式数据层时开放",
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsRow(
+                    icon = Icons.Filled.DeleteOutline,
+                    title = "清除本地数据",
+                    description = "删除前会再次向你确认",
+                )
             }
         }
     }
@@ -481,24 +498,64 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun PersonaListItem(persona: AiPersona, selected: Boolean, onClick: () -> Unit) {
-    PaperCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        contentPadding = PaddingValues(0.dp),
+private fun SettingsRow(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        ListItem(
-            headlineContent = { Text(persona.name) },
-            supportingContent = {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(persona.description)
-                    Text(persona.responseStyle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            leadingContent = { Icon(Icons.Filled.AutoAwesome, contentDescription = null) },
-            trailingContent = {
-                if (selected) Icon(Icons.Filled.CheckCircle, contentDescription = "当前角色", tint = MaterialTheme.colorScheme.primary)
-            },
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
         )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun PersonaListItem(persona: AiPersona, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                shape = MaterialTheme.shapes.medium,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.AutoAwesome,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                .padding(9.dp),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(persona.name, style = MaterialTheme.typography.titleMedium)
+            Text(persona.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(persona.responseStyle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        }
+        if (selected) {
+            Icon(Icons.Filled.CheckCircle, contentDescription = "当前角色", tint = MaterialTheme.colorScheme.primary)
+        }
     }
 }
 
