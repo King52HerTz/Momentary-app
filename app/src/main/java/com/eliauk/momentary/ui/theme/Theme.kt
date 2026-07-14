@@ -7,6 +7,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
@@ -55,10 +57,22 @@ private object ColorTokens {
 }
 
 private val MomentaryShapes = Shapes(
-    small = RoundedCornerShape(6.dp),
-    medium = RoundedCornerShape(8.dp),
-    large = RoundedCornerShape(16.dp),
+    extraSmall = RoundedCornerShape(2.dp),
+    small = RoundedCornerShape(4.dp),
+    medium = RoundedCornerShape(6.dp),
+    large = RoundedCornerShape(8.dp),
 )
+
+data class MomentarySpacing(
+    val xs: androidx.compose.ui.unit.Dp = 4.dp,
+    val sm: androidx.compose.ui.unit.Dp = 8.dp,
+    val md: androidx.compose.ui.unit.Dp = 12.dp,
+    val lg: androidx.compose.ui.unit.Dp = 16.dp,
+    val xl: androidx.compose.ui.unit.Dp = 24.dp,
+    val xxl: androidx.compose.ui.unit.Dp = 32.dp,
+)
+
+val LocalMomentarySpacing = staticCompositionLocalOf { MomentarySpacing() }
 
 @Composable
 fun MomentaryTheme(
@@ -74,10 +88,12 @@ fun MomentaryTheme(
             window.navigationBarColor = colors.background.toArgb()
         }
     }
-    MaterialTheme(
-        colorScheme = colors,
-        typography = MomentaryTypography,
-        shapes = MomentaryShapes,
-        content = content,
-    )
+    CompositionLocalProvider(LocalMomentarySpacing provides MomentarySpacing()) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = MomentaryTypography,
+            shapes = MomentaryShapes,
+            content = content,
+        )
+    }
 }

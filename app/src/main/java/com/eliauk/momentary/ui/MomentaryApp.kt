@@ -1,8 +1,9 @@
 package com.eliauk.momentary.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
@@ -22,12 +23,14 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -75,32 +78,41 @@ fun MomentaryApp(viewModel: MomentaryViewModel) {
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 ) {
-                    topDestinations.take(2).forEach { destination ->
-                        MomentaryNavigationItem(destination, currentRoute == destination.route) {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        windowInsets = WindowInsets.navigationBars,
+                    ) {
+                        topDestinations.take(2).forEach { destination ->
+                            MomentaryNavigationItem(destination, currentRoute == destination.route) {
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         }
-                    }
-                    FloatingActionButton(
-                        onClick = { showCapture = true },
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = "记录新片刻")
-                    }
-                    topDestinations.drop(2).forEach { destination ->
-                        MomentaryNavigationItem(destination, currentRoute == destination.route) {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                        FloatingActionButton(
+                            onClick = { showCapture = true },
+                            modifier = Modifier.height(56.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(0.dp, 0.dp),
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = "记录新片刻")
+                        }
+                        topDestinations.drop(2).forEach { destination ->
+                            MomentaryNavigationItem(destination, currentRoute == destination.route) {
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         }
                     }
@@ -212,9 +224,11 @@ private fun androidx.compose.foundation.layout.RowScope.MomentaryNavigationItem(
         },
         label = { androidx.compose.material3.Text(destination.label) },
         colors = NavigationBarItemDefaults.colors(
-            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+            indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
             selectedIconColor = MaterialTheme.colorScheme.primary,
             selectedTextColor = MaterialTheme.colorScheme.primary,
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     )
 }
