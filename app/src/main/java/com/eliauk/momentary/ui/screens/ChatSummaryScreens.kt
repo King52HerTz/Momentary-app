@@ -1,5 +1,8 @@
 package com.eliauk.momentary.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,9 +16,12 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -27,7 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +42,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +58,7 @@ import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.ChatMessage
 import com.eliauk.momentary.model.MomentaryUiState
 import com.eliauk.momentary.ui.components.PaperCard
+import com.eliauk.momentary.ui.components.RoundIconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,34 +91,42 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
                     .navigationBarsPadding()
-                    .imePadding()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .imePadding(),
             ) {
-                TextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("随时和片刻说说……") },
-                    shape = MaterialTheme.shapes.large,
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                    ),
-                )
-                IconButton(
-                    onClick = {
-                        onSend(draft)
-                        draft = ""
-                    },
-                    enabled = draft.isNotBlank(),
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送")
+                    TextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("随时说说……") },
+                        shape = MaterialTheme.shapes.medium,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                    )
+                    RoundIconButton(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "发送",
+                        onClick = {
+                            if (draft.isNotBlank()) {
+                                onSend(draft)
+                                draft = ""
+                            }
+                        },
+                    )
                 }
             }
         },
@@ -127,23 +143,13 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "persona_switcher", contentType = "persona_switcher") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("选择此刻需要的陪伴", style = MaterialTheme.typography.labelLarge)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(personas, key = { it.id }) { persona ->
-                            FilterChip(
-                                selected = persona.id == activePersonaId,
-                                onClick = { onSelectPersona(persona.id) },
-                                label = { Text(persona.name) },
-                            )
-                        }
-                    }
-                    Text(
-                        activePersona.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                PersonaStrip(personas, activePersonaId, onSelectPersona)
+                Text(
+                    activePersona.description,
+                    modifier = Modifier.padding(top = 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (messages.isEmpty()) {
                 item(key = "empty_message", contentType = "empty") {
@@ -175,9 +181,15 @@ private fun ChatBubble(
     ) {
         PaperCard(
             modifier = Modifier.fillMaxWidth(if (message.isUser) 0.82f else 0.9f),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(horizontal = 15.dp, vertical = 13.dp),
+            containerColor = if (message.isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+            shape = if (message.isUser) {
+                RoundedCornerShape(topStart = 8.dp, topEnd = 2.dp, bottomEnd = 8.dp, bottomStart = 8.dp)
+            } else {
+                RoundedCornerShape(topStart = 2.dp, topEnd = 8.dp, bottomEnd = 8.dp, bottomStart = 8.dp)
+            },
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (!message.isUser) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -186,27 +198,60 @@ private fun ChatBubble(
                 }
                 Text(message.text, style = MaterialTheme.typography.bodyLarge)
                 if (!message.isUser) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = { onFavorite(message.id) },
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                        ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { onFavorite(message.id) }) {
                             Icon(
                                 if (message.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                 contentDescription = null,
+                                modifier = Modifier.size(19.dp),
                             )
                             Text(if (message.isFavorite) "已收藏" else "收藏", Modifier.padding(start = 6.dp))
                         }
-                        Button(
+                        TextButton(
                             onClick = { onIncludeToday(message.id) },
                             enabled = !message.isIncludedToday,
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                         ) {
-                            Icon(if (message.isIncludedToday) Icons.Filled.Check else Icons.Filled.AutoAwesome, contentDescription = null)
+                            Icon(if (message.isIncludedToday) Icons.Filled.Check else Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(19.dp))
                             Text(if (message.isIncludedToday) "已收录" else "收录到今天", Modifier.padding(start = 6.dp))
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonaStrip(
+    personas: List<AiPersona>,
+    activePersonaId: String,
+    onSelectPersona: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        personas.forEach { persona ->
+            val selected = persona.id == activePersonaId
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 68.dp)
+                    .clickable { onSelectPersona(persona.id) }
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    persona.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Box(
+                    Modifier
+                        .height(2.dp)
+                        .fillMaxWidth()
+                        .background(if (selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
+                )
             }
         }
     }
