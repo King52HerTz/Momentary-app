@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Favorite
@@ -22,7 +23,6 @@ import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.PsychologyAlt
 import androidx.compose.material.icons.filled.SelfImprovement
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SentimentDissatisfied
 import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material3.Button
@@ -84,7 +84,7 @@ fun TodayScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item {
-            TodayHeader(state.userName)
+            TodayHeader(state.userName, state.todayLabel)
         }
         item {
             CaptureCard(
@@ -141,7 +141,7 @@ fun TodayScreen(
 }
 
 @Composable
-private fun TodayHeader(userName: String) {
+private fun TodayHeader(userName: String, todayLabel: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -154,7 +154,7 @@ private fun TodayHeader(userName: String) {
             }
         }
         Text("早上好，$userName", style = MaterialTheme.typography.headlineLarge)
-        Text("7月14日 · 星期二", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(todayLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -184,7 +184,7 @@ private fun CaptureCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RoundIconButton(
-                    imageVector = if (draft.isBlank()) Icons.Filled.KeyboardVoice else Icons.Filled.Send,
+                    imageVector = if (draft.isBlank()) Icons.Filled.KeyboardVoice else Icons.AutoMirrored.Filled.Send,
                     contentDescription = if (draft.isBlank()) "语音记录，尚未开放" else "保存片刻",
                     onClick = { if (draft.isNotBlank()) onSend() },
                 )

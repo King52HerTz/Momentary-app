@@ -4,13 +4,19 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.eliauk.momentary.data.MomentaryStore
 import com.eliauk.momentary.data.PrototypeAiService
+import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.ChatMessage
 import com.eliauk.momentary.model.EntrySource
 import com.eliauk.momentary.model.Journal
 import com.eliauk.momentary.model.MomentEntry
 import com.eliauk.momentary.model.MomentaryUiState
+import com.eliauk.momentary.model.PersonaDefaults
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.format.DateTimeFormatterBuilder
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +26,8 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
     private val store = MomentaryStore(application)
     private val aiService = PrototypeAiService()
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+    private val today = LocalDate.now()
+    private val todayLabel = buildTodayLabel(today)
 
     private val initialEntries = listOf(
         MomentEntry(1, "08:30", "做了十分钟拉伸，身体舒服了很多。"),
@@ -35,30 +43,65 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
     )
 
     private val loadedEntries = store.loadEntries().ifEmpty { initialEntries }
+    private val defaultChatMessages = listOf(
+        ChatMessage(1, "最近总觉得有点累，提不起劲。", isUser = true),
+        ChatMessage(
+            2,
+            "听起来你最近在消耗很多精力。你愿意和我聊聊，最近让你累的是什么吗？",
+            isUser = false,
+        ),
+    )
+    private val defaultJournals = listOf(
+        Journal(
+            id = 1,
+            date = "5月9日 · 星期五",
+            title = "实验室小记",
+            body = "高考完的那个暑假，我把大学生活想成一万种颜色。\n\n它应该是凌晨三点的烧烤摊，是社团招新时震天响的音箱，是躺在草坪上数星星数到睡着的夜晚，是遇见一个人，然后整个青春都亮起来。\n\n后来我在大学待了两年。两年足够让所有颜色褪成灰色。我终于搞明白一件事，大学不是迪士尼，大学是高中的加长续集。\n\n今天其实憋了一肚子话。想了想，说到底就是累。",
+        )
+    )
+    private val loadedPersonas = store.loadPersonas().ifEmpty { PersonaDefaults.all() }
+    private val loadedActivePersonaId = store.loadActivePersonaId()
+        .takeIf { id -> loadedPersonas.any { it.id == id } }
+        ?: PersonaDefaults.MOMENTARY_ID
     private val _uiState = MutableStateFlow(
         MomentaryUiState(
+            todayLabel = todayLabel,
+            selectedMood = store.loadSelectedMood(),
             entries = loadedEntries,
-            chatMessages = listOf(
-                ChatMessage(1, "最近总觉得有点累，提不起劲。", isUser = true),
-                ChatMessage(
-                    2,
-                    "听起来你最近在消耗很多精力。你愿意和我聊聊，最近让你累的是什么吗？",
-                    isUser = false,
-                ),
-            ),
-            journals = listOf(
-                Journal(
-                    id = 1,
-                    date = "5月9日 · 星期五",
-                    title = "实验室小记",
-                    body = "高考完的那个暑假，我把大学生活想成一万种颜色。\n\n它应该是凌晨三点的烧烤摊，是社团招新时震天响的音箱，是躺在草坪上数星星数到睡着的夜晚，是遇见一个人，然后整个青春都亮起来。\n\n后来我在大学待了两年。两年足够让所有颜色褪成灰色。我终于搞明白一件事，大学不是迪士尼，大学是高中的加长续集。\n\n今天其实憋了一肚子话。想了想，说到底就是累。",
-                )
-            ),
+            chatMessages = store.loadChatMessages().ifEmpty { defaultChatMessages },
+            journals = store.loadJournals().ifEmpty { defaultJournals },
+            personas = loadedPersonas,
+            activePersonaId = loadedActivePersonaId,
         )
     )
     val uiState: StateFlow<MomentaryUiState> = _uiState.asStateFlow()
 
-    fun selectMood(mood: String) = _uiState.update { it.copy(selectedMood = mood) }
+    fun selectMood(mood: String) {
+        _uiState.update { it.copy(selectedMood = mood) }
+        store.saveSelectedMood(mood)
+    }
+
+    fun selectPersona(personaId: String) {
+        if (_uiState.value.personas.none { it.id == personaId }) return
+        _uiState.update { it.copy(activePersonaId = personaId) }
+        store.saveActivePersonaId(personaId)
+    }
+
+    fun createPersona(name: String, description: String, responseStyle: String) {
+        val cleanName = name.trim()
+        val cleanDescription = description.trim()
+        val cleanStyle = responseStyle.trim()
+        if (cleanName.isEmpty() || cleanDescription.isEmpty() || cleanStyle.isEmpty()) return
+        val persona = AiPersona(
+            id = "custom_${System.currentTimeMillis()}",
+            name = cleanName,
+            description = cleanDescription,
+            responseStyle = cleanStyle,
+        )
+        _uiState.update { it.copy(personas = it.personas + persona, activePersonaId = persona.id) }
+        store.savePersonas(_uiState.value.personas)
+        store.saveActivePersonaId(persona.id)
+    }
 
     fun addMoment(text: String) {
         val clean = text.trim()
@@ -83,13 +126,19 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
         val clean = text.trim()
         if (clean.isEmpty()) return
         val now = System.currentTimeMillis()
-        val userMessage = ChatMessage(now, clean, isUser = true)
-        val aiMessage = ChatMessage(now + 1, aiService.replyTo(clean), isUser = false)
+        val persona = _uiState.value.personas.firstOrNull { it.id == _uiState.value.activePersonaId }
+            ?: PersonaDefaults.all().first()
+        val userMessage = ChatMessage(now, clean, isUser = true, personaId = persona.id)
+        val aiMessage = ChatMessage(now + 1, aiService.replyTo(clean, persona), isUser = false, personaId = persona.id)
         _uiState.update { it.copy(chatMessages = it.chatMessages + userMessage + aiMessage) }
+        store.saveChatMessages(_uiState.value.chatMessages)
     }
 
-    fun toggleChatFavorite(id: Long) = _uiState.update { state ->
-        state.copy(chatMessages = state.chatMessages.map { if (it.id == id) it.copy(isFavorite = !it.isFavorite) else it })
+    fun toggleChatFavorite(id: Long) {
+        _uiState.update { state ->
+            state.copy(chatMessages = state.chatMessages.map { if (it.id == id) it.copy(isFavorite = !it.isFavorite) else it })
+        }
+        store.saveChatMessages(_uiState.value.chatMessages)
     }
 
     fun includeChatToday(id: Long) {
@@ -110,18 +159,26 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
             store.saveEntries(_uiState.value.entries)
+            store.saveChatMessages(_uiState.value.chatMessages)
         }
     }
 
     fun saveTodayAsJournal() {
-        if (_uiState.value.journals.any { it.date.startsWith("今天") }) return
+        if (_uiState.value.journals.any { it.date == todayLabel }) return
         val body = _uiState.value.entries.joinToString("\n\n") { it.text }
         val journal = Journal(
             id = System.currentTimeMillis(),
-            date = "今天 · 7月14日",
+            date = todayLabel,
             title = "把片刻装订成今天",
             body = body,
         )
         _uiState.update { it.copy(journals = listOf(journal) + it.journals) }
+        store.saveJournals(_uiState.value.journals)
+    }
+
+    private fun buildTodayLabel(date: LocalDate): String {
+        val datePart = date.format(DateTimeFormatterBuilder().appendPattern("M月d日").toFormatter(Locale.CHINA))
+        val weekday = date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
+        return "$datePart · $weekday"
     }
 }

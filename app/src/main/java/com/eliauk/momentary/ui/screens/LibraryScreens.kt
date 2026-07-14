@@ -1,6 +1,7 @@
 package com.eliauk.momentary.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
@@ -35,6 +38,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -43,9 +48,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +67,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.eliauk.momentary.R
+import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.Journal
 import com.eliauk.momentary.model.MomentaryUiState
 import com.eliauk.momentary.ui.components.PaperCard
@@ -235,7 +243,8 @@ fun FavoritesScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(message.text, style = MaterialTheme.typography.bodyLarge)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("片刻 AI", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            val personaName = state.personas.firstOrNull { it.id == message.personaId }?.name ?: "AI 回响"
+                            Text(personaName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                             IconButton(onClick = { onToggleChat(message.id) }) { Icon(Icons.Filled.Favorite, "取消收藏") }
                         }
                     }
@@ -253,8 +262,15 @@ fun FavoritesScreen(
 }
 
 @Composable
-fun ProfileScreen(contentPadding: PaddingValues) {
+fun ProfileScreen(
+    state: MomentaryUiState,
+    contentPadding: PaddingValues,
+    onSelectPersona: (String) -> Unit,
+    onCreatePersona: (String, String, String) -> Unit,
+) {
     var darkMode by remember { mutableStateOf(false) }
+    var showCreatePersona by remember { mutableStateOf(false) }
+    val activePersona = state.personas.firstOrNull { it.id == state.activePersonaId } ?: state.personas.first()
     LazyColumn(
         contentPadding = PaddingValues(
             start = 20.dp,
@@ -274,11 +290,30 @@ fun ProfileScreen(contentPadding: PaddingValues) {
             }
         }
         item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("我的陪伴角色", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                IconButton(onClick = { showCreatePersona = true }) {
+                    Icon(Icons.Filled.Add, contentDescription = "创建陪伴角色")
+                }
+            }
+        }
+        items(state.personas, key = { "persona_${it.id}" }, contentType = { "persona" }) { persona ->
+            PersonaListItem(
+                persona = persona,
+                selected = persona.id == activePersona.id,
+                onClick = { onSelectPersona(persona.id) },
+            )
+        }
+        item {
             PaperCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
                 Column {
                     ListItem(
                         headlineContent = { Text("AI 陪伴风格") },
-                        supportingContent = { Text("温柔叙事 · 少建议 · 会追问") },
+                        supportingContent = { Text("当前：${activePersona.name} · ${activePersona.responseStyle}") },
                         leadingContent = { Icon(Icons.Filled.AutoAwesome, null) },
                     )
                     HorizontalDivider()
@@ -323,4 +358,81 @@ fun ProfileScreen(contentPadding: PaddingValues) {
             }
         }
     }
+
+    if (showCreatePersona) {
+        CreatePersonaDialog(
+            onDismiss = { showCreatePersona = false },
+            onCreate = { name, description, style ->
+                onCreatePersona(name, description, style)
+                showCreatePersona = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun PersonaListItem(persona: AiPersona, selected: Boolean, onClick: () -> Unit) {
+    PaperCard(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        ListItem(
+            headlineContent = { Text(persona.name) },
+            supportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(persona.description)
+                    Text(persona.responseStyle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            leadingContent = { Icon(Icons.Filled.AutoAwesome, contentDescription = null) },
+            trailingContent = {
+                if (selected) Icon(Icons.Filled.CheckCircle, contentDescription = "当前角色", tint = MaterialTheme.colorScheme.primary)
+            },
+        )
+    }
+}
+
+@Composable
+private fun CreatePersonaDialog(onDismiss: () -> Unit, onCreate: (String, String, String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var style by remember { mutableStateOf("") }
+    val canCreate = name.isNotBlank() && description.isNotBlank() && style.isNotBlank()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("创建陪伴角色") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("描述你需要的陪伴方式，不必模仿某一位真实作家。", style = MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("角色名称") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("他如何陪伴你") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = style,
+                    onValueChange = { style = it },
+                    label = { Text("回应偏好") },
+                    placeholder = { Text("例如：温暖、有画面感、少说教") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onCreate(name, description, style) }, enabled = canCreate) {
+                Text("创建并使用")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
 }

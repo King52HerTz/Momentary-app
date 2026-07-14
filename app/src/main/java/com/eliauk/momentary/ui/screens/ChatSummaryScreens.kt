@@ -14,18 +14,20 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.ChatMessage
 import com.eliauk.momentary.model.MomentaryUiState
 import com.eliauk.momentary.ui.components.PaperCard
@@ -53,12 +56,16 @@ import com.eliauk.momentary.ui.components.PaperCard
 @Composable
 fun ChatScreen(
     messages: List<ChatMessage>,
+    personas: List<AiPersona>,
+    activePersonaId: String,
     onBack: () -> Unit,
+    onSelectPersona: (String) -> Unit,
     onSend: (String) -> Unit,
     onFavorite: (Long) -> Unit,
     onIncludeToday: (Long) -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
+    val activePersona = personas.firstOrNull { it.id == activePersonaId } ?: personas.first()
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
@@ -67,7 +74,7 @@ fun ChatScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("和片刻聊聊") },
+                title = { Text("和${activePersona.name}聊聊") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -103,7 +110,7 @@ fun ChatScreen(
                     },
                     enabled = draft.isNotBlank(),
                 ) {
-                    Icon(Icons.Filled.Send, contentDescription = "发送")
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送")
                 }
             }
         },
@@ -119,8 +126,37 @@ fun ChatScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            item(key = "persona_switcher", contentType = "persona_switcher") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("选择此刻需要的陪伴", style = MaterialTheme.typography.labelLarge)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(personas, key = { it.id }) { persona ->
+                            FilterChip(
+                                selected = persona.id == activePersonaId,
+                                onClick = { onSelectPersona(persona.id) },
+                                label = { Text(persona.name) },
+                            )
+                        }
+                    }
+                    Text(
+                        activePersona.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (messages.isEmpty()) {
+                item(key = "empty_message", contentType = "empty") {
+                    PaperCard(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "我是${activePersona.name}。${activePersona.description}\n\n你想从哪一个片刻说起？",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
             items(messages, key = { it.id }, contentType = { if (it.isUser) "user" else "ai" }) { message ->
-                ChatBubble(message, onFavorite, onIncludeToday)
+                ChatBubble(message, activePersona.name, onFavorite, onIncludeToday)
             }
         }
     }
@@ -129,6 +165,7 @@ fun ChatScreen(
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
+    personaName: String,
     onFavorite: (Long) -> Unit,
     onIncludeToday: (Long) -> Unit,
 ) {
@@ -144,7 +181,7 @@ private fun ChatBubble(
                 if (!message.isUser) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("片刻 AI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Text(personaName, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Text(message.text, style = MaterialTheme.typography.bodyLarge)
@@ -193,7 +230,7 @@ fun SummaryScreen(state: MomentaryUiState, onBack: () -> Unit, onSave: () -> Uni
             CenterAlignedTopAppBar(
                 title = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("今日总结")
-                    Text("7月14日 · 星期二", style = MaterialTheme.typography.labelMedium)
+                    Text(state.todayLabel, style = MaterialTheme.typography.labelMedium)
                 } },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
             )

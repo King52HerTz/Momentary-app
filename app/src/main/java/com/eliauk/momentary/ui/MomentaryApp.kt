@@ -138,11 +138,21 @@ fun MomentaryApp(viewModel: MomentaryViewModel) {
                     onToggleChat = viewModel::toggleChatFavorite,
                 )
             }
-            composable("profile") { ProfileScreen(innerPadding) }
+            composable("profile") {
+                ProfileScreen(
+                    state = state,
+                    contentPadding = innerPadding,
+                    onSelectPersona = viewModel::selectPersona,
+                    onCreatePersona = viewModel::createPersona,
+                )
+            }
             composable("chat") {
                 ChatScreen(
-                    messages = state.chatMessages,
+                    messages = state.chatMessages.filter { it.personaId == state.activePersonaId },
+                    personas = state.personas,
+                    activePersonaId = state.activePersonaId,
                     onBack = navController::popBackStack,
+                    onSelectPersona = viewModel::selectPersona,
                     onSend = viewModel::sendChat,
                     onFavorite = viewModel::toggleChatFavorite,
                     onIncludeToday = viewModel::includeChatToday,
