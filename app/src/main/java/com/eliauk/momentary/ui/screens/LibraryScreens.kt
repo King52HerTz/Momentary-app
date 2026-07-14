@@ -30,19 +30,18 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +59,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
@@ -73,6 +73,7 @@ import com.eliauk.momentary.model.MomentaryUiState
 import com.eliauk.momentary.ui.components.PaperCard
 import com.eliauk.momentary.ui.components.SectionTitle
 import com.eliauk.momentary.ui.theme.JournalBodyStyle
+import com.eliauk.momentary.ui.theme.Sun
 
 @Composable
 fun JournalsScreen(
@@ -271,47 +272,101 @@ fun FavoritesScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { Text("我的回响", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary) }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("全部", "AI回响", "我的笔记").forEach { label ->
-                    FilterChip(selected = filter == label, onClick = { filter = label }, label = { Text(label) })
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("我的回响", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    "那些值得多读一次的话。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+        }
+        item {
+            FavoriteFilterTabs(selected = filter, onSelect = { filter = it })
         }
         if (filter != "AI回响") {
             items(favoriteEntries, key = { "entry_${it.id}" }) { entry ->
-                PaperCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(entry.text, style = MaterialTheme.typography.bodyLarge)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("我的笔记 · ${entry.time}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            IconButton(onClick = { onToggleEntry(entry.id) }) { Icon(Icons.Filled.Favorite, "取消收藏") }
-                        }
-                    }
-                }
+                FavoritePaper(
+                    text = entry.text,
+                    source = "我的笔记 · ${entry.time}",
+                    onUnfavorite = { onToggleEntry(entry.id) },
+                )
             }
         }
         if (filter != "我的笔记") {
             items(favoriteChats, key = { "chat_${it.id}" }) { message ->
-                PaperCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(message.text, style = MaterialTheme.typography.bodyLarge)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            val personaName = state.personas.firstOrNull { it.id == message.personaId }?.name ?: "AI 回响"
-                            Text(personaName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                            IconButton(onClick = { onToggleChat(message.id) }) { Icon(Icons.Filled.Favorite, "取消收藏") }
-                        }
-                    }
-                }
+                val personaName = state.personas.firstOrNull { it.id == message.personaId }?.name ?: "AI 回响"
+                FavoritePaper(
+                    text = message.text,
+                    source = personaName,
+                    onUnfavorite = { onToggleChat(message.id) },
+                )
             }
         }
         if (favoriteEntries.isEmpty() && favoriteChats.isEmpty()) {
             item {
-                PaperCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("还没有收藏。遇到想带走的话时，轻轻点一下爱心。", style = MaterialTheme.typography.bodyLarge)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(Icons.Filled.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp))
+                    Text("还没有收藏", style = MaterialTheme.typography.titleMedium)
+                    Text("遇到想带走的话时，轻轻点一下星标。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteFilterTabs(selected: String, onSelect: (String) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        listOf("全部", "AI回响", "我的笔记").forEach { label ->
+            val isSelected = selected == label
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onSelect(label) }
+                    .padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider(
+                    thickness = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoritePaper(text: String, source: String, onUnfavorite: () -> Unit) {
+    PaperCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = onUnfavorite, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.Star, "取消收藏", tint = Sun)
+                }
+            }
+            Text(source, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
