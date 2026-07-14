@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,7 +36,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -290,23 +288,47 @@ fun SummaryScreen(state: MomentaryUiState, onBack: () -> Unit, onSave: () -> Uni
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            items(blocks, key = { it.title }) { block ->
-                PaperCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            block.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.semantics { heading() },
-                        )
-                        Text(block.body, style = MaterialTheme.typography.bodyLarge)
+            item {
+                PaperCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+                ) {
+                    Column {
+                        blocks.forEachIndexed { index, block ->
+                            SummarySection(
+                                number = (index + 1).toString().padStart(2, '0'),
+                                block = block,
+                            )
+                            if (index < blocks.lastIndex) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                        }
                     }
                 }
             }
             item {
-                PaperCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("片刻的回应", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                PaperCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                "片刻的回应",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.semantics { heading() },
+                            )
+                        }
                         Text(
                             "你并不是没有做成什么。你今天照顾了身体、认真听了朋友，也把那些容易消失的感受留下来了。生活不总靠巨大的进展向前，有时只是把注意力放回真正重要的地方。",
                             style = MaterialTheme.typography.bodyLarge,
@@ -318,14 +340,51 @@ fun SummaryScreen(state: MomentaryUiState, onBack: () -> Unit, onSave: () -> Uni
                 Button(
                     onClick = onSave,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.size(8.dp))
                     Text("装订成今天", style = MaterialTheme.typography.titleMedium)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SummarySection(number: String, block: SummaryBlock) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            number,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.widthIn(min = 24.dp),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                block.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                block.body,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
