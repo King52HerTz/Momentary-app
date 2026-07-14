@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
@@ -47,7 +48,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -71,6 +71,8 @@ import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.Journal
 import com.eliauk.momentary.model.MomentaryUiState
 import com.eliauk.momentary.ui.components.PaperCard
+import com.eliauk.momentary.ui.components.SectionTitle
+import com.eliauk.momentary.ui.theme.JournalBodyStyle
 
 @Composable
 fun JournalsScreen(
@@ -98,44 +100,46 @@ fun JournalsScreen(
             }
         }
         item {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Image(
                     painter = painterResource(R.drawable.app_icon),
                     contentDescription = "片刻日记本",
-                    modifier = Modifier.size(190.dp).clip(RoundedCornerShape(48.dp)),
+                    modifier = Modifier.size(148.dp).clip(RoundedCornerShape(42.dp)),
                     contentScale = ContentScale.Fit,
                 )
-                Text("已经留下 ${journals.size} 篇日记", style = MaterialTheme.typography.titleMedium)
-                Text("每一篇都从真实的片刻开始", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        item {
-            Text("最近装订", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        }
-        items(journals, key = { it.id }) { journal ->
-            PaperCard(modifier = Modifier.fillMaxWidth(), onClick = { onJournalClick(journal) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(journal.date, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(journal.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("2026 年", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("${journals.size} 篇", style = MaterialTheme.typography.headlineMedium)
                     Text(
-                        journal.body.replace("\n", " ").take(92) + if (journal.body.length > 92) "……" else "",
+                        "从真实片刻里，\n慢慢装订出的生活。",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
         item {
-            Text("按月浏览", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+            SectionTitle("按月浏览", modifier = Modifier.fillMaxWidth())
         }
         item {
-            MonthGrid()
+            MonthGrid(journals.size)
+        }
+        item {
+            SectionTitle("最近装订", modifier = Modifier.fillMaxWidth())
+        }
+        items(journals, key = { it.id }) { journal ->
+            JournalIndexRow(journal = journal, onClick = { onJournalClick(journal) })
         }
     }
 }
 
 @Composable
-private fun MonthGrid() {
-    val months = listOf("7月" to "${1}篇", "5月" to "12篇", "4月" to "18篇", "3月" to "15篇", "2月" to "10篇", "1月" to "8篇")
+private fun MonthGrid(currentCount: Int) {
+    val months = listOf("7月" to "${currentCount}篇", "6月" to "0篇", "5月" to "12篇", "4月" to "18篇", "3月" to "15篇", "2月" to "10篇")
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxWidth().height(230.dp),
@@ -144,13 +148,57 @@ private fun MonthGrid() {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(months, key = { it.first }) { (month, count) ->
-            PaperCard(modifier = Modifier.aspectRatio(1f), contentPadding = PaddingValues(12.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            PaperCard(
+                modifier = Modifier.aspectRatio(1f),
+                contentPadding = PaddingValues(12.dp),
+                containerColor = if (month == "7月") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
                     Text(month, style = MaterialTheme.typography.titleMedium)
                     Text(count, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun JournalIndexRow(journal: Journal, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(modifier = Modifier.width(72.dp)) {
+                Text(
+                    journal.date.substringAfter("年").substringBefore(" ·"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text("已装订", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(journal.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    journal.body.replace("\n", " ").take(46) + if (journal.body.length > 46) "……" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -176,18 +224,25 @@ fun JournalDetailScreen(journal: Journal, onBack: () -> Unit) {
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(journal.title, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
-            Text(journal.date, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Text(journal.body, style = MaterialTheme.typography.bodyLarge)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = {}, modifier = Modifier.weight(1f)) {
+            PaperCard(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 28.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(journal.title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(journal.date, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Text(journal.body, style = JournalBodyStyle, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                TextButton(onClick = {}) {
                     Icon(Icons.Filled.FavoriteBorder, contentDescription = null)
                     Text("收藏", Modifier.padding(start = 6.dp))
                 }
-                OutlinedButton(onClick = {}, modifier = Modifier.weight(1f)) {
+                TextButton(onClick = {}) {
                     Icon(Icons.Filled.Share, contentDescription = null)
                     Text("生成长图", Modifier.padding(start = 6.dp))
                 }
