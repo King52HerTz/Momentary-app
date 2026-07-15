@@ -130,6 +130,11 @@ fun MomentaryApp(viewModel: MomentaryViewModel) {
                     onToggleFavorite = viewModel::toggleEntryFavorite,
                     onChat = { navController.navigate("chat") },
                     onSummary = { navController.navigate("summary") },
+                    onStartDiary = {
+                        viewModel.startDiarySession()
+                        navController.navigate("chat")
+                    },
+                    onContinueDiary = { navController.navigate("chat") },
                 )
             }
             composable("journals") {
@@ -159,8 +164,13 @@ fun MomentaryApp(viewModel: MomentaryViewModel) {
                 )
             }
             composable("chat") {
+                val sessionStartedAt = state.diarySession.startedAt
                 ChatScreen(
-                    messages = state.chatMessages.filter { it.personaId == state.activePersonaId },
+                    messages = state.chatMessages.filter { message ->
+                        message.personaId == state.activePersonaId &&
+                            (state.diarySession.state != com.eliauk.momentary.model.DiarySessionState.COLLECTING ||
+                                sessionStartedAt == null || message.id >= sessionStartedAt)
+                    },
                     personas = state.personas,
                     activePersonaId = state.activePersonaId,
                     onBack = navController::popBackStack,
@@ -168,6 +178,11 @@ fun MomentaryApp(viewModel: MomentaryViewModel) {
                     onSend = viewModel::sendChat,
                     onFavorite = viewModel::toggleChatFavorite,
                     onIncludeToday = viewModel::includeChatToday,
+                    diarySession = state.diarySession,
+                    onEndDiary = {
+                        viewModel.endDiarySession()
+                        navController.navigate("summary")
+                    },
                 )
             }
             composable("summary") {

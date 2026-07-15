@@ -4,8 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.eliauk.momentary.data.MomentaryStore
 import com.eliauk.momentary.data.PrototypeAiService
+import com.eliauk.momentary.domain.DiarySessionStateMachine
 import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.ChatMessage
+import com.eliauk.momentary.model.DiarySessionState
 import com.eliauk.momentary.model.EntrySource
 import com.eliauk.momentary.model.Journal
 import com.eliauk.momentary.model.MomentEntry
@@ -27,6 +29,7 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
     private val aiService = PrototypeAiService()
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     private val today = LocalDate.now()
+    private val todayIso = today.toString()
     private val todayLabel = buildTodayLabel(today)
 
     private val initialEntries = listOf(
@@ -63,6 +66,7 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
     private val loadedActivePersonaId = store.loadActivePersonaId()
         .takeIf { id -> loadedPersonas.any { it.id == id } }
         ?: PersonaDefaults.MOMENTARY_ID
+    private val loadedDiarySession = DiarySessionStateMachine.forDate(store.loadDiarySession(), todayIso)
     private val _uiState = MutableStateFlow(
         MomentaryUiState(
             todayLabel = todayLabel,
@@ -72,6 +76,7 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
             journals = store.loadJournals().ifEmpty { defaultJournals },
             personas = loadedPersonas,
             activePersonaId = loadedActivePersonaId,
+            diarySession = loadedDiarySession,
         )
     )
     val uiState: StateFlow<MomentaryUiState> = _uiState.asStateFlow()
@@ -112,7 +117,35 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
             text = clean,
         )
         _uiState.update { it.copy(entries = it.entries + newEntry) }
+        collectDiaryEntryIfNeeded(newEntry.id)
         store.saveEntries(_uiState.value.entries)
+    }
+
+    fun startDiarySession() {
+        val state = _uiState.value
+        if (state.diarySession.state != DiarySessionState.IDLE) return
+        val session = DiarySessionStateMachine.start(state.diarySession, System.currentTimeMillis())
+        val opening = ChatMessage(
+            id = System.currentTimeMillis() + 1,
+            text = "今天也不必写得完整，想到什么，就慢慢说给我听。",
+            isUser = false,
+            personaId = state.activePersonaId,
+        )
+        _uiState.update { it.copy(diarySession = session, chatMessages = it.chatMessages + opening) }
+        store.saveDiarySession(session)
+        store.saveChatMessages(_uiState.value.chatMessages)
+    }
+
+    fun endDiarySession() {
+        val session = _uiState.value.diarySession
+        if (session.state != DiarySessionState.COLLECTING) return
+        val generating = DiarySessionStateMachine.beginGeneration(session)
+        _uiState.update { it.copy(diarySession = generating, isGenerating = true) }
+        store.saveDiarySession(generating)
+
+        val reviewing = DiarySessionStateMachine.markReviewing(generating)
+        _uiState.update { it.copy(diarySession = reviewing, isGenerating = false) }
+        store.saveDiarySession(reviewing)
     }
 
     fun toggleEntryFavorite(id: Long) {
@@ -129,6 +162,27 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
         val persona = _uiState.value.personas.firstOrNull { it.id == _uiState.value.activePersonaId }
             ?: PersonaDefaults.all().first()
         val userMessage = ChatMessage(now, clean, isUser = true, personaId = persona.id)
+        if (_uiState.value.diarySession.state == DiarySessionState.COLLECTING) {
+            val entry = MomentEntry(
+                id = now + 1,
+                time = LocalTime.now().format(timeFormatter),
+                text = clean,
+                source = EntrySource.CHAT,
+            )
+            val receipt = ChatMessage(now + 2, "收到", isUser = false, personaId = persona.id)
+            val session = DiarySessionStateMachine.collect(_uiState.value.diarySession, entry.id)
+            _uiState.update {
+                it.copy(
+                    entries = it.entries + entry,
+                    chatMessages = it.chatMessages + userMessage + receipt,
+                    diarySession = session,
+                )
+            }
+            store.saveEntries(_uiState.value.entries)
+            store.saveChatMessages(_uiState.value.chatMessages)
+            store.saveDiarySession(session)
+            return
+        }
         val aiMessage = ChatMessage(now + 1, aiService.replyTo(clean, persona), isUser = false, personaId = persona.id)
         _uiState.update { it.copy(chatMessages = it.chatMessages + userMessage + aiMessage) }
         store.saveChatMessages(_uiState.value.chatMessages)
@@ -164,16 +218,31 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun saveTodayAsJournal() {
-        if (_uiState.value.journals.any { it.date == todayLabel }) return
-        val body = _uiState.value.entries.joinToString("\n\n") { it.text }
-        val journal = Journal(
-            id = System.currentTimeMillis(),
-            date = todayLabel,
-            title = "把片刻装订成今天",
-            body = body,
-        )
-        _uiState.update { it.copy(journals = listOf(journal) + it.journals) }
-        store.saveJournals(_uiState.value.journals)
+        if (_uiState.value.journals.none { it.date == todayLabel }) {
+            val body = _uiState.value.entries.joinToString("\n\n") { it.text }
+            val journal = Journal(
+                id = System.currentTimeMillis(),
+                date = todayLabel,
+                title = "把片刻装订成今天",
+                body = body,
+            )
+            _uiState.update { it.copy(journals = listOf(journal) + it.journals) }
+            store.saveJournals(_uiState.value.journals)
+        }
+        val session = _uiState.value.diarySession
+        if (session.state == DiarySessionState.REVIEWING) {
+            val completed = DiarySessionStateMachine.complete(session, System.currentTimeMillis())
+            _uiState.update { it.copy(diarySession = completed) }
+            store.saveDiarySession(completed)
+        }
+    }
+
+    private fun collectDiaryEntryIfNeeded(entryId: Long) {
+        val session = _uiState.value.diarySession
+        if (session.state != DiarySessionState.COLLECTING) return
+        val updated = DiarySessionStateMachine.collect(session, entryId)
+        _uiState.update { it.copy(diarySession = updated) }
+        store.saveDiarySession(updated)
     }
 
     private fun buildTodayLabel(date: LocalDate): String {

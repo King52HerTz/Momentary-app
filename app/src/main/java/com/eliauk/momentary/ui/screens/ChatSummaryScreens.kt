@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -54,6 +55,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.ChatMessage
+import com.eliauk.momentary.model.DiarySession
+import com.eliauk.momentary.model.DiarySessionState
 import com.eliauk.momentary.model.MomentaryUiState
 import com.eliauk.momentary.ui.components.PaperCard
 import com.eliauk.momentary.ui.components.RoundIconButton
@@ -69,18 +72,22 @@ fun ChatScreen(
     onSend: (String) -> Unit,
     onFavorite: (Long) -> Unit,
     onIncludeToday: (Long) -> Unit,
+    diarySession: DiarySession,
+    onEndDiary: () -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
+    var showEndConfirmation by remember { mutableStateOf(false) }
+    val isCollecting = diarySession.state == DiarySessionState.COLLECTING
     val activePersona = personas.firstOrNull { it.id == activePersonaId } ?: personas.first()
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(messages.size, isCollecting) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size)
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("和${activePersona.name}聊聊") },
+                title = { Text(if (isCollecting) "记录今天" else "和${activePersona.name}聊聊") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -106,7 +113,7 @@ fun ChatScreen(
                         value = draft,
                         onValueChange = { draft = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("随时说说……") },
+                        placeholder = { Text(if (isCollecting) "继续说说今天发生的事……" else "随时说说……") },
                         shape = MaterialTheme.shapes.medium,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -140,14 +147,21 @@ fun ChatScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item(key = "persona_switcher", contentType = "persona_switcher") {
-                PersonaStrip(personas, activePersonaId, onSelectPersona)
-                Text(
-                    activePersona.description,
-                    modifier = Modifier.padding(top = 10.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            item(key = "chat_context", contentType = "chat_context") {
+                if (isCollecting) {
+                    DiaryCollectingBanner(
+                        count = diarySession.entryIds.size,
+                        onEnd = { showEndConfirmation = true },
+                    )
+                } else {
+                    PersonaStrip(personas, activePersonaId, onSelectPersona)
+                    Text(
+                        activePersona.description,
+                        modifier = Modifier.padding(top = 10.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             if (messages.isEmpty()) {
                 item(key = "empty_message", contentType = "empty") {
@@ -160,7 +174,50 @@ fun ChatScreen(
                 }
             }
             items(messages, key = { it.id }, contentType = { if (it.isUser) "user" else "ai" }) { message ->
-                ChatBubble(message, activePersona.name, onFavorite, onIncludeToday)
+                ChatBubble(message, activePersona.name, onFavorite, onIncludeToday, isCollecting)
+            }
+        }
+    }
+
+    if (showEndConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showEndConfirmation = false },
+            title = { Text("结束今天的日记？") },
+            text = { Text("已经收下 ${diarySession.entryIds.size} 个片刻。结束后会进入整理与确认页面。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showEndConfirmation = false
+                        onEndDiary()
+                    },
+                    shape = MaterialTheme.shapes.medium,
+                ) { Text("结束并整理") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndConfirmation = false }) { Text("继续记录") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun DiaryCollectingBanner(count: Int, onEnd: () -> Unit) {
+    PaperCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("日记采集中", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Text("$count 条", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
+            Text("想到什么就继续说。我会先安静收好，只回复“收到”。", style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = onEnd, modifier = Modifier.align(Alignment.End)) {
+                Text("结束今天的日记")
             }
         }
     }
@@ -172,6 +229,7 @@ private fun ChatBubble(
     personaName: String,
     onFavorite: (Long) -> Unit,
     onIncludeToday: (Long) -> Unit,
+    isDiaryCollecting: Boolean,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -188,14 +246,14 @@ private fun ChatBubble(
             },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                if (!message.isUser) {
+                if (!message.isUser && !isDiaryCollecting) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text(personaName, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Text(message.text, style = MaterialTheme.typography.bodyLarge)
-                if (!message.isUser) {
+                if (!message.isUser && !isDiaryCollecting) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { onFavorite(message.id) }) {
                             Icon(

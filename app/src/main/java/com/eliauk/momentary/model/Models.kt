@@ -72,6 +72,23 @@ data class Journal(
     val isFavorite: Boolean = false,
 )
 
+enum class DiarySessionState {
+    IDLE,
+    COLLECTING,
+    GENERATING,
+    REVIEWING,
+    COMPLETED,
+}
+
+@Immutable
+data class DiarySession(
+    val localDate: String,
+    val state: DiarySessionState = DiarySessionState.IDLE,
+    val startedAt: Long? = null,
+    val completedAt: Long? = null,
+    val entryIds: List<Long> = emptyList(),
+)
+
 @Immutable
 data class MomentaryUiState(
     val userName: String = "Eliauk",
@@ -82,5 +99,6 @@ data class MomentaryUiState(
     val journals: List<Journal> = emptyList(),
     val personas: List<AiPersona> = PersonaDefaults.all(),
     val activePersonaId: String = PersonaDefaults.MOMENTARY_ID,
+    val diarySession: DiarySession = DiarySession(localDate = ""),
     val isGenerating: Boolean = false,
 )

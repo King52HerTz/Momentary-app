@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.core.content.edit
 import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.ChatMessage
+import com.eliauk.momentary.model.DiarySession
+import com.eliauk.momentary.model.DiarySessionState
 import com.eliauk.momentary.model.EntrySource
 import com.eliauk.momentary.model.Journal
 import com.eliauk.momentary.model.MomentEntry
@@ -127,6 +129,35 @@ class MomentaryStore(context: Context) {
 
     fun saveActivePersonaId(personaId: String) = preferences.edit { putString(KEY_ACTIVE_PERSONA, personaId) }
 
+    fun loadDiarySession(): DiarySession? {
+        val raw = preferences.getString(KEY_DIARY_SESSION, null) ?: return null
+        return runCatching {
+            val item = JSONObject(raw)
+            val entryIds = item.optJSONArray("entryIds") ?: JSONArray()
+            DiarySession(
+                localDate = item.getString("localDate"),
+                state = DiarySessionState.valueOf(item.optString("state", DiarySessionState.IDLE.name)),
+                startedAt = item.optNullableLong("startedAt"),
+                completedAt = item.optNullableLong("completedAt"),
+                entryIds = buildList {
+                    repeat(entryIds.length()) { index -> add(entryIds.getLong(index)) }
+                },
+            )
+        }.getOrNull()
+    }
+
+    fun saveDiarySession(session: DiarySession) {
+        val entryIds = JSONArray()
+        session.entryIds.forEach(entryIds::put)
+        val item = JSONObject()
+            .put("localDate", session.localDate)
+            .put("state", session.state.name)
+            .put("startedAt", session.startedAt ?: JSONObject.NULL)
+            .put("completedAt", session.completedAt ?: JSONObject.NULL)
+            .put("entryIds", entryIds)
+        preferences.edit { putString(KEY_DIARY_SESSION, item.toString()) }
+    }
+
     private fun <T> readArray(key: String, transform: (JSONObject) -> T): List<T> {
         val raw = preferences.getString(key, null) ?: return emptyList()
         return runCatching {
@@ -143,6 +174,10 @@ class MomentaryStore(context: Context) {
         preferences.edit { putString(key, array.toString()) }
     }
 
+    private fun JSONObject.optNullableLong(key: String): Long? {
+        return if (has(key) && !isNull(key)) getLong(key) else null
+    }
+
     private companion object {
         const val KEY_ENTRIES = "entries"
         const val KEY_CHAT_MESSAGES = "chat_messages"
@@ -150,5 +185,6 @@ class MomentaryStore(context: Context) {
         const val KEY_PERSONAS = "personas"
         const val KEY_SELECTED_MOOD = "selected_mood"
         const val KEY_ACTIVE_PERSONA = "active_persona"
+        const val KEY_DIARY_SESSION = "diary_session"
     }
 }

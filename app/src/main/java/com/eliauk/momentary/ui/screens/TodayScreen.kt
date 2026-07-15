@@ -61,6 +61,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.eliauk.momentary.model.MomentEntry
 import com.eliauk.momentary.model.MomentaryUiState
+import com.eliauk.momentary.model.DiarySession
+import com.eliauk.momentary.model.DiarySessionState
 import com.eliauk.momentary.ui.components.PaperCard
 import com.eliauk.momentary.ui.components.RoundIconButton
 import com.eliauk.momentary.ui.components.SectionTitle
@@ -85,6 +87,8 @@ fun TodayScreen(
     onToggleFavorite: (Long) -> Unit,
     onChat: () -> Unit,
     onSummary: () -> Unit,
+    onStartDiary: () -> Unit,
+    onContinueDiary: () -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
     LazyColumn(
@@ -105,6 +109,14 @@ fun TodayScreen(
                     onAddMoment(draft)
                     draft = ""
                 },
+            )
+        }
+        item {
+            DiarySessionCard(
+                session = state.diarySession,
+                onStart = onStartDiary,
+                onContinue = onContinueDiary,
+                onReview = onSummary,
             )
         }
         item {
@@ -147,6 +159,64 @@ fun TodayScreen(
             ) {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
                 Text("整理今天", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiarySessionCard(
+    session: DiarySession,
+    onStart: () -> Unit,
+    onContinue: () -> Unit,
+    onReview: () -> Unit,
+) {
+    val collecting = session.state == DiarySessionState.COLLECTING
+    PaperCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = if (collecting) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Filled.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp),
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    when (session.state) {
+                        DiarySessionState.IDLE -> "开始今天的日记"
+                        DiarySessionState.COLLECTING -> "正在记录今天"
+                        DiarySessionState.GENERATING -> "正在整理今天"
+                        DiarySessionState.REVIEWING -> "今天的日记草稿"
+                        DiarySessionState.COMPLETED -> "今天已经装订"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    when (session.state) {
+                        DiarySessionState.IDLE -> "我会安静收下你接下来想说的话。"
+                        DiarySessionState.COLLECTING -> "已收到 ${session.entryIds.size} 个片刻，期间只回应“收到”。"
+                        DiarySessionState.GENERATING -> "正在把零散片刻整理成一篇日记。"
+                        DiarySessionState.REVIEWING -> "草稿已经准备好，确认后再装订。"
+                        DiarySessionState.COMPLETED -> "今天说过的话已经好好收进本子里。"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            when (session.state) {
+                DiarySessionState.IDLE -> TextButton(onClick = onStart) { Text("开始") }
+                DiarySessionState.COLLECTING -> TextButton(onClick = onContinue) { Text("继续") }
+                DiarySessionState.REVIEWING -> TextButton(onClick = onReview) { Text("查看") }
+                DiarySessionState.GENERATING,
+                DiarySessionState.COMPLETED -> Unit
             }
         }
     }
