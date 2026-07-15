@@ -101,4 +101,6 @@ data class MomentaryUiState(
     val activePersonaId: String = PersonaDefaults.MOMENTARY_ID,
     val diarySession: DiarySession = DiarySession(localDate = ""),
     val isGenerating: Boolean = false,
+    val isChatReplyPending: Boolean = false,
+    val chatError: String? = null,
 )

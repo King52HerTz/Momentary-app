@@ -2,8 +2,11 @@ package com.eliauk.momentary
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.eliauk.momentary.data.AiCompanionService
+import com.eliauk.momentary.data.AiGatewayException
 import com.eliauk.momentary.data.MomentaryStore
-import com.eliauk.momentary.data.PrototypeAiService
+import com.eliauk.momentary.data.RemoteAiCompanionService
 import com.eliauk.momentary.domain.DiarySessionStateMachine
 import com.eliauk.momentary.model.AiPersona
 import com.eliauk.momentary.model.ChatMessage
@@ -19,14 +22,19 @@ import java.time.format.DateTimeFormatterBuilder
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MomentaryViewModel(application: Application) : AndroidViewModel(application) {
     private val store = MomentaryStore(application)
-    private val aiService = PrototypeAiService()
+    private val aiService: AiCompanionService = RemoteAiCompanionService(BuildConfig.AI_GATEWAY_URL)
+    private var failedChatRequest: PendingChatRequest? = null
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     private val today = LocalDate.now()
     private val todayIso = today.toString()
@@ -88,7 +96,8 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun selectPersona(personaId: String) {
         if (_uiState.value.personas.none { it.id == personaId }) return
-        _uiState.update { it.copy(activePersonaId = personaId) }
+        _uiState.update { it.copy(activePersonaId = personaId, chatError = null) }
+        failedChatRequest = null
         store.saveActivePersonaId(personaId)
     }
 
@@ -157,12 +166,13 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun sendChat(text: String) {
         val clean = text.trim()
-        if (clean.isEmpty()) return
+        if (clean.isEmpty() || _uiState.value.isChatReplyPending) return
         val now = System.currentTimeMillis()
-        val persona = _uiState.value.personas.firstOrNull { it.id == _uiState.value.activePersonaId }
+        val state = _uiState.value
+        val persona = state.personas.firstOrNull { it.id == state.activePersonaId }
             ?: PersonaDefaults.all().first()
         val userMessage = ChatMessage(now, clean, isUser = true, personaId = persona.id)
-        if (_uiState.value.diarySession.state == DiarySessionState.COLLECTING) {
+        if (state.diarySession.state == DiarySessionState.COLLECTING) {
             val entry = MomentEntry(
                 id = now + 1,
                 time = LocalTime.now().format(timeFormatter),
@@ -183,9 +193,35 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
             store.saveDiarySession(session)
             return
         }
-        val aiMessage = ChatMessage(now + 1, aiService.replyTo(clean, persona), isUser = false, personaId = persona.id)
-        _uiState.update { it.copy(chatMessages = it.chatMessages + userMessage + aiMessage) }
+
+        val request = PendingChatRequest(
+            message = clean,
+            persona = persona,
+            context = state.chatMessages.filter { it.personaId == persona.id }.takeLast(20),
+        )
+        failedChatRequest = null
+        _uiState.update {
+            it.copy(
+                chatMessages = it.chatMessages + userMessage,
+                isChatReplyPending = true,
+                chatError = null,
+            )
+        }
         store.saveChatMessages(_uiState.value.chatMessages)
+        requestAiReply(request)
+    }
+
+    fun retryChat() {
+        val request = failedChatRequest ?: return
+        if (_uiState.value.isChatReplyPending) return
+        failedChatRequest = null
+        _uiState.update { it.copy(isChatReplyPending = true, chatError = null) }
+        requestAiReply(request)
+    }
+
+    fun dismissChatError() {
+        failedChatRequest = null
+        _uiState.update { it.copy(chatError = null) }
     }
 
     fun toggleChatFavorite(id: Long) {
@@ -245,9 +281,54 @@ class MomentaryViewModel(application: Application) : AndroidViewModel(applicatio
         store.saveDiarySession(updated)
     }
 
+    private fun requestAiReply(request: PendingChatRequest) {
+        viewModelScope.launch {
+            try {
+                val reply = withContext(Dispatchers.IO) {
+                    aiService.replyTo(request.message, request.persona, request.context)
+                }
+                val nextId = maxOf(
+                    System.currentTimeMillis(),
+                    (_uiState.value.chatMessages.maxOfOrNull { it.id } ?: 0L) + 1,
+                )
+                val aiMessage = ChatMessage(
+                    id = nextId,
+                    text = reply,
+                    isUser = false,
+                    personaId = request.persona.id,
+                )
+                _uiState.update {
+                    it.copy(
+                        chatMessages = it.chatMessages + aiMessage,
+                        isChatReplyPending = false,
+                        chatError = null,
+                    )
+                }
+                store.saveChatMessages(_uiState.value.chatMessages)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                failedChatRequest = request
+                _uiState.update {
+                    it.copy(
+                        isChatReplyPending = false,
+                        chatError = (error as? AiGatewayException)?.userMessage
+                            ?: "AI 服务暂时不可用，请稍后再试",
+                    )
+                }
+            }
+        }
+    }
+
     private fun buildTodayLabel(date: LocalDate): String {
         val datePart = date.format(DateTimeFormatterBuilder().appendPattern("M月d日").toFormatter(Locale.CHINA))
         val weekday = date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.CHINA)
         return "$datePart · $weekday"
     }
 }
+
+private data class PendingChatRequest(
+    val message: String,
+    val persona: AiPersona,
+    val context: List<ChatMessage>,
+)

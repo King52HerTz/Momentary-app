@@ -179,6 +179,10 @@ fun MomentaryApp(viewModel: MomentaryViewModel) {
                     onFavorite = viewModel::toggleChatFavorite,
                     onIncludeToday = viewModel::includeChatToday,
                     diarySession = state.diarySession,
+                    isReplyPending = state.isChatReplyPending,
+                    chatError = state.chatError,
+                    onRetry = viewModel::retryChat,
+                    onDismissError = viewModel::dismissChatError,
                     onEndDiary = {
                         viewModel.endDiarySession()
                         navController.navigate("summary")

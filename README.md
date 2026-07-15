@@ -5,7 +5,7 @@
 ## 当前可用功能
 
 - 今日片刻：快速输入、心情选择、时间线和收藏。
-- 多角色陪伴：三种内置角色、自定义角色、角色独立对话和差异化回复。
+- 多角色陪伴：三种内置角色、自定义角色、角色独立对话和 AI 网关回复。
 - 和片刻聊聊：切换陪伴角色、收藏回复、收录到今日。
 - 今日总结：事件、状态、灵感、感谢、待办和温和回应。
 - 日记本：保存今日总结、查看历史日记和按月浏览。
@@ -37,7 +37,15 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## AI 接入边界
 
-当前 `PrototypeAiService` 用本地规则模拟回复，不会上传日记，也不需要在客户端保存 API Key。接入正式服务时，实现 `AiCompanionService`，通过后端代理调用模型即可；UI 和 ViewModel 的交互接口无需重写。
+Android 客户端只连接受控 AI 网关，不保存模型供应商的 API Key。普通聊天最多发送当前角色最近 20 条对话；日记采集模式不会请求 AI，只在本地保存内容并回复“收到”。
+
+Debug 构建默认访问 Android 模拟器宿主机的 `http://10.0.2.2:8787`。可在构建时覆盖网关地址：
+
+```powershell
+.\gradlew.bat assembleDebug -PAI_GATEWAY_URL=https://your-gateway.example.com
+```
+
+Release 构建没有默认地址，必须通过 `AI_GATEWAY_URL` 注入 HTTPS 网关。API Key 只能配置在网关运行环境中，不能写入 `local.properties`、Gradle 脚本或 APK。
 
 ## 开发计划
 

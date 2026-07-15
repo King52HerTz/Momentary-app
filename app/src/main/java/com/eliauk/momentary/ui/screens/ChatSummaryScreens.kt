@@ -26,12 +26,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -74,14 +77,21 @@ fun ChatScreen(
     onIncludeToday: (Long) -> Unit,
     diarySession: DiarySession,
     onEndDiary: () -> Unit,
+    isReplyPending: Boolean,
+    chatError: String?,
+    onRetry: () -> Unit,
+    onDismissError: () -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
     var showEndConfirmation by remember { mutableStateOf(false) }
     val isCollecting = diarySession.state == DiarySessionState.COLLECTING
     val activePersona = personas.firstOrNull { it.id == activePersonaId } ?: personas.first()
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    LaunchedEffect(messages.size, isCollecting) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size)
+    LaunchedEffect(messages.size, isCollecting, isReplyPending, chatError) {
+        if (messages.isNotEmpty()) {
+            val statusItem = if (!isCollecting && (isReplyPending || chatError != null)) 1 else 0
+            listState.animateScrollToItem(messages.size + statusItem)
+        }
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -131,6 +141,7 @@ fun ChatScreen(
                                 draft = ""
                             }
                         },
+                        enabled = !isReplyPending,
                     )
                 }
             }
@@ -176,6 +187,19 @@ fun ChatScreen(
             items(messages, key = { it.id }, contentType = { if (it.isUser) "user" else "ai" }) { message ->
                 ChatBubble(message, activePersona.name, onFavorite, onIncludeToday, isCollecting)
             }
+            if (!isCollecting && isReplyPending) {
+                item(key = "reply_pending", contentType = "status") {
+                    ReplyPending(activePersona.name)
+                }
+            } else if (!isCollecting && chatError != null) {
+                item(key = "reply_error", contentType = "status") {
+                    ChatError(
+                        message = chatError,
+                        onRetry = onRetry,
+                        onDismiss = onDismissError,
+                    )
+                }
+            }
         }
     }
 
@@ -197,6 +221,65 @@ fun ChatScreen(
                 TextButton(onClick = { showEndConfirmation = false }) { Text("继续记录") }
             },
         )
+    }
+}
+
+@Composable
+private fun ReplyPending(personaName: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+    ) {
+        PaperCard(
+            modifier = Modifier.fillMaxWidth(0.62f),
+            contentPadding = PaddingValues(horizontal = 15.dp, vertical = 14.dp),
+            shape = RoundedCornerShape(topStart = 2.dp, topEnd = 8.dp, bottomEnd = 8.dp, bottomStart = 8.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text("$personaName 正在回应……", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatError(
+    message: String,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    PaperCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Row(
+                modifier = Modifier.align(Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("忽略", Modifier.padding(start = 6.dp))
+                }
+                TextButton(onClick = onRetry) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("重试", Modifier.padding(start = 6.dp))
+                }
+            }
+        }
     }
 }
 

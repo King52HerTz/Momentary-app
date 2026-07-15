@@ -1,14 +1,19 @@
 package com.eliauk.momentary.data
 
 import com.eliauk.momentary.model.AiPersona
+import com.eliauk.momentary.model.ChatMessage
 import com.eliauk.momentary.model.PersonaDefaults
 
 interface AiCompanionService {
-    fun replyTo(message: String, persona: AiPersona): String
+    fun replyTo(
+        message: String,
+        persona: AiPersona,
+        context: List<ChatMessage> = emptyList(),
+    ): String
 }
 
 class PrototypeAiService : AiCompanionService {
-    override fun replyTo(message: String, persona: AiPersona): String {
+    override fun replyTo(message: String, persona: AiPersona, context: List<ChatMessage>): String {
         val core = when {
         "累" in message || "疲" in message ->
             "听起来你最近消耗了很多精力。我们可以先不急着解决全部事情，只看看此刻最需要被照顾的那一部分。"

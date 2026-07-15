@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val configuredAiGatewayUrl = providers.gradleProperty("AI_GATEWAY_URL").orNull
+
 android {
     namespace = "com.eliauk.momentary"
     compileSdk = 36
@@ -20,8 +22,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            val gatewayUrl = configuredAiGatewayUrl ?: "http://10.0.2.2:8787"
+            buildConfigField("String", "AI_GATEWAY_URL", "\"$gatewayUrl\"")
+        }
         release {
             isMinifyEnabled = false
+            buildConfigField("String", "AI_GATEWAY_URL", "\"${configuredAiGatewayUrl.orEmpty()}\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -59,6 +66,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
     implementation("androidx.navigation:navigation-compose:2.9.1")
 
