@@ -10,3 +10,5 @@ build/
 *.iml
 captures/
 artifacts/
+/backend/
+/docs/AI后端架构.md
